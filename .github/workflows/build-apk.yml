@@ -1,0 +1,80 @@
+name: Build APK
+
+# 手机上也能出包：把工程压缩包传到仓库根目录，这里会自动解压再编译。
+# 结果在 Actions 运行页面底部 Artifacts 里下载。
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Locate project
+        id: locate
+        run: |
+          if [ -f pubspec.yaml ]; then
+            echo "dir=." >> $GITHUB_OUTPUT
+            echo "工程已在仓库根目录"
+          else
+            ZIPFILE=$(ls -1 *.zip 2>/dev/null | head -n 1)
+            if [ -z "$ZIPFILE" ]; then
+              echo "::error::没找到 pubspec.yaml，也没找到工程压缩包"
+              exit 1
+            fi
+            mkdir -p _src && unzip -oq "$ZIPFILE" -d _src
+            if [ -f _src/pubspec.yaml ]; then
+              echo "dir=_src" >> $GITHUB_OUTPUT
+            elif [ -f _src/handnote_skeleton/pubspec.yaml ]; then
+              echo "dir=_src/handnote_skeleton" >> $GITHUB_OUTPUT
+            else
+              echo "::error::压缩包里没找到 pubspec.yaml"
+              exit 1
+            fi
+            echo "已解压：$ZIPFILE"
+          fi
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.24.0'
+          channel: 'stable'
+          cache: true
+
+      - name: Prepare assets
+        working-directory: ${{ steps.locate.outputs.dir }}
+        run: |
+          mkdir -p assets/fonts
+          if [ ! -f assets/fonts/NotoSansSC-Regular.ttf ]; then
+            curl -L --retry 3 -o /tmp/font.otf \
+              "https://raw.githubusercontent.com/googlefonts/noto-cjk/main/Sans/SubsetOTF/SC/NotoSansSC-Regular.otf" || true
+            if [ -s /tmp/font.otf ]; then cp /tmp/font.otf assets/fonts/NotoSansSC-Regular.ttf; fi
+          fi
+          ls -lh assets/fonts || true
+
+      - name: Get dependencies
+        working-directory: ${{ steps.locate.outputs.dir }}
+        run: flutter pub get
+
+      - name: Build release APK
+        working-directory: ${{ steps.locate.outputs.dir }}
+        run: flutter build apk --release --split-per-abi
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: handnote-apk
+          path: |
+            ${{ steps.locate.outputs.dir }}/build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
+            ${{ steps.locate.outputs.dir }}/build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk
+            ${{ steps.locate.outputs.dir }}/build/app/outputs/flutter-apk/app-x86_64-release.apk
+          if-no-files-found: warn
