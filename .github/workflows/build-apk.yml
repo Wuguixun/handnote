@@ -1,7 +1,5 @@
 name: Build APK
 
-# 手机上也能出包：把工程压缩包传到仓库根目录，这里会自动解压再编译。
-# 结果在 Actions 运行页面底部 Artifacts 里下载。
 on:
   push:
     branches: [ main ]
@@ -29,27 +27,11 @@ jobs:
       - name: Prepare project
         run: |
           set -e
-          mkdir -p _src
-          ZIPFILE=$(ls -1 *.zip 2>/dev/null | head -n 1)
-          if [ -z "$ZIPFILE" ]; then
-            echo "::error::没找到工程压缩包"
-            exit 1
-          fi
-          unzip -oq "$ZIPFILE" -d _src
-          if [ -f _src/pubspec.yaml ]; then
-            SKELLIB=_src
-          elif [ -f _src/handnote_skeleton/pubspec.yaml ]; then
-            SKELLIB=_src/handnote_skeleton
-          else
-            echo "::error::压缩包里没找到 pubspec.yaml"
-            exit 1
-          fi
-          echo "Skeleton dir: $SKELLIB"
+          # 仓库根目录直接有 lib/ 和 pubspec.yaml
           flutter create --project-name my_handnote --platforms=android app
-          rm -rf app/lib
-          cp -r "$SKELLIB/lib" app/lib
-          cp "$SKELLIB/pubspec.yaml" app/pubspec.yaml
-          # 把 compileSdk 提到 35
+          cp -r lib app/lib
+          cp pubspec.yaml app/pubspec.yaml
+          # compileSdk 提到 35（record 插件要求）
           sed -i 's/compileSdk flutter.compileSdkVersion/compileSdk 35/' app/android/app/build.gradle
           grep -n "compileSdk" app/android/app/build.gradle
 
