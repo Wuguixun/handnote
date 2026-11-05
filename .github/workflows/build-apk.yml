@@ -22,7 +22,7 @@ jobs:
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.24.0'
+          flutter-version: '3.27.0'
           channel: 'stable'
           cache: true
 
@@ -36,7 +36,6 @@ jobs:
             exit 1
           fi
           unzip -oq "$ZIPFILE" -d _src
-          # 找到含 pubspec.yaml 的目录
           if [ -f _src/pubspec.yaml ]; then
             SKELLIB=_src
           elif [ -f _src/handnote_skeleton/pubspec.yaml ]; then
@@ -46,14 +45,13 @@ jobs:
             exit 1
           fi
           echo "Skeleton dir: $SKELLIB"
-          # 新建一个干净的 Flutter 工程
           flutter create --project-name my_handnote --platforms=android app
-          # 用骨架的 lib/ 和 pubspec.yaml 覆盖
           rm -rf app/lib
           cp -r "$SKELLIB/lib" app/lib
           cp "$SKELLIB/pubspec.yaml" app/pubspec.yaml
-          echo "dir=app" >> $GITHUB_ENV
-          ls -la app/
+          # 把 compileSdk 提到 35
+          sed -i 's/compileSdk flutter.compileSdkVersion/compileSdk 35/' app/android/app/build.gradle
+          grep -n "compileSdk" app/android/app/build.gradle
 
       - name: Prepare assets
         working-directory: app
