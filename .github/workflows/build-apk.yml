@@ -50,6 +50,16 @@ jobs:
           channel: 'stable'
           cache: true
 
+      - name: Scaffold Android project
+        working-directory: ${{ steps.locate.outputs.dir }}
+        run: |
+          if [ ! -d android ]; then
+            echo "缺少 android/ 目录，用 flutter create 补全工程骨架"
+            flutter create .
+          else
+            echo "android/ 目录已存在，跳过 scaffold"
+          fi
+
       - name: Prepare assets
         working-directory: ${{ steps.locate.outputs.dir }}
         run: |
